@@ -1,6 +1,6 @@
 ;Started off from tutorial: http://noobtuts.com/clojure/2d-snake-game
 ;so there are a lot of similarities in the code
-(ns snake.core
+(ns snake-game.core
   (:import [java.awt.event KeyEvent])
   (:use [quil.core :as q]))
 ;helper funtions
@@ -18,34 +18,43 @@
 
 
 ;snake
-(def snake-body (atom [[0 0] [1 0] [2 0] [3 0]]))
-(def snake-dir (atom [0 1]))
+(def snake-body (atom {:body [[0 0] [1 0] [2 0] [3 0]] :dir [0 1]}))
+
 ;functions that operate on snake
 (defn self-collide? []
-  (some #{(first @snake-body)} (rest @snake-body)))
+  (let [{:keys [body]} @snake-body]
+    (some #{(first body)} (rest body))))
+
+(defn grow-snake [body]
+  (vec (conj body (nth body (dec (count body))))))
 
 (defn snake-outside-screen? []
-  (let [[x y] (first @snake-body)]
+  (let [{:keys [body]} @snake-body
+        [x y] (first body)]
     (or (>= x block-amount) (< x 0)
         (>= y block-amount) (< y 0))))
 
 (defn move-snake []
-  (let [new-head (v+ (first @snake-body) @snake-dir)]
-           (swap! snake-body #(vec (cons new-head (pop %)))))       ;pop tail, add new head
-  )
+  (let [{:keys [body dir]} @snake-body]
+    (let [new-head (v+ (first body) dir)]
+      (swap! snake-body update-in [:body]
+             #(vec (cons new-head (pop %))))))) ;pop tail, add new head
+
+(defn snake-change-dir [x y]
+  (swap! snake-body update-in [:dir] (fn [_] reset! [x y])))
+
 (defn reset-game! []
-  (reset! snake-body [[0 0] [1 0] [2 0] [3 0]])
-  (reset! food #{})
-  (reset! snake-dir [0 1]))
+  (reset! snake-body {:body [[0 0] [1 0] [2 0] [3 0]] :dir [0 1]})
+  (reset! food #{}))
 ;watcher that detects food collision
 (add-watch snake-body :key (fn [k r os ns]
-                        (let [meal  (get @food (first ns))]
-                          (when meal
-                            (swap! food disj meal)          ;Removes the food piece
-                            (swap! snake-body
-                                   #(vec (conj % (nth % (dec (count %)))))) ;Re-adds tail, so it does not get shortened
-                            )))
-           )
+                             (let [{:keys [body]} ns
+                                  meal  (get @food (first body))]
+                               (when meal
+                                 (swap! food disj meal)                 ;Removes the food piece
+                                   (swap! snake-body update-in [:body]
+                                          #(grow-snake %))))))          ;Re-adds tail, so it does not get shortened
+
 ; update
 (defn update []
   (when-not (or (self-collide?) (snake-outside-screen?))
@@ -55,32 +64,31 @@
 
 ; draw
 (defn draw []
-  ; set background color to dark gray, draw color to white
-  (q/background-float 0x20)
-  ;draw snake
-  (q/fill 0 255 0)
-  (doseq [[x y] @snake-body]
-    (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
-  ;draw food
-  (q/fill 255 0 0)
-  (doseq [[x y] @food]
-    (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
-  ;(fill 0x00 0xff 0xff)
-  ;(q/rect (* 1 cell-width) (* 1 cell-width) cell-width cell-width)
-  )
+  (let [{:keys [body]} @snake-body]
+    ; set background color to dark gray, draw color to white
+    (q/background-float 0x20)
+    ;draw snake
+    (q/fill 0 255 0)
+    (doseq [[x y] body]
+      (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
+    ;draw food
+    (q/fill 255 0 0)
+    (doseq [[x y] @food]
+      (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
+    ))
 
 
 ; input
 (defn key-pressed []
-  (cond
-    (= (q/key-code) (KeyEvent/VK_UP)) (reset! snake-dir [0 -1])
-    (= (q/key-code) (KeyEvent/VK_DOWN)) (reset! snake-dir [0 1])
-    (= (q/key-code) (KeyEvent/VK_LEFT)) (reset! snake-dir [-1 0])
-    (= (q/key-code) (KeyEvent/VK_RIGHT)) (reset! snake-dir [1 0])
-    (= (q/key-code) (KeyEvent/VK_SPACE)) (reset-game!)
-    )
-  )
-(q/defsketch snake
+  (let [{:keys [dir]} @snake-body]
+    (cond
+      (= (q/key-code) (KeyEvent/VK_UP)) (if (not (= dir [0 1])) (snake-change-dir 0 -1))
+      (= (q/key-code) (KeyEvent/VK_DOWN)) (if (not (= dir [0 -1])) (snake-change-dir 0 1))
+      (= (q/key-code) (KeyEvent/VK_LEFT)) (if (not (= dir [1 0])) (snake-change-dir -1 0))
+      (= (q/key-code) (KeyEvent/VK_RIGHT)) (if (not (= dir [-1 0])) (snake-change-dir 1 0))
+      (= (q/key-code) (KeyEvent/VK_SPACE)) (reset-game!)
+      )))
+(q/defsketch snake-game
              :title "Snake"
              :size [scr-size scr-size]
              :setup (fn [] (q/smooth) (q/no-stroke) (q/frame-rate 30))
