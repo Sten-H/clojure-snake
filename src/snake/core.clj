@@ -10,7 +10,7 @@
 (def cell-width (/ scr-size block-amount))
 
 (defn draw []
-  (let [{:keys [body dead?]} @rules/snake-body]
+  (let [{:keys [body dead? food]} @rules/snake]
     (q/background-float 0x20)
     ;draw snake
     (q/fill 0 255 0)
@@ -18,17 +18,24 @@
       (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
     ;draw food
     (q/fill 255 0 0)
-    (doseq [[x y] @rules/food]
+    (doseq [[x y] food]
       (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
     ;draw text if dead
-    (q/fill 255 255 255)
-    (if dead?
-      (q/text "Space to start!"
+
+    (when dead?
+      (q/fill 200 200 200)
+      (q/text "Space to start! \nctrl to rewind time"
               (/ scr-size 2)
-              (/ scr-size 2)))))
+              (/ scr-size 2)))
+    (when @rules/rev-time
+      (q/fill 133 133 133)
+      (q/text "Rewinding..."
+              (/ scr-size 2)
+              (/ scr-size 2)))
+      ))
 ; input
 (defn key-pressed []
-  (let [{:keys [dir]} @rules/snake-body]
+  (let [{:keys [dir]} @rules/snake]
     (cond
       (= (q/key-code) (KeyEvent/VK_UP)) (if (not (= dir [0 1])) (rules/snake-change-dir 0 -1))
       (= (q/key-code) (KeyEvent/VK_DOWN)) (if (not (= dir [0 -1])) (rules/snake-change-dir 0 1))
@@ -38,8 +45,8 @@
       (= (q/key-code) (KeyEvent/VK_SPACE)) (rules/reset-game!))))
 
 (defn setup []                                              ;quil start setup
-  (q/smooth) (q/no-stroke) (q/frame-rate 30) (q/text-font (q/create-font "DejaVu Sans" 28 true))
-  (q/text-align :center :center))
+  (q/smooth) (q/no-stroke) (q/frame-rate 25) (q/text-font (q/create-font "DejaVu Sans" 28 true))
+  (q/text-align :center :center) (rules/define-matrix block-amount))
 
 (q/defsketch snake-game
              :title "Snake"
