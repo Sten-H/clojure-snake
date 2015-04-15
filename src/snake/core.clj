@@ -3,22 +3,19 @@
 (ns snake-game.core
   (:import [java.awt.event KeyEvent])
   (:use [quil.core :as q]))
+
 ;helper funtions
 (defn v+ [v1 v2]
   (mapv + v1 v2))
-(defn place-food? [] (< (rand) 0.1))
-
-;food container
-(def food (atom #{}))
+(defn place-food? [] (< (rand) 0.05))
 
 ;screen variables
 (def scr-size 400)
 (def block-amount 40)
 (def cell-width (/ scr-size block-amount))
 
-
 ;snake
-(def snake-body (atom {:body [[0 0] [1 0] [2 0] [3 0]] :dir [0 1]}))
+(def snake-body (atom {:body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? true}))
 
 ;functions that operate on snake
 (defn self-collide? []
@@ -43,8 +40,26 @@
 (defn snake-change-dir [x y]
   (swap! snake-body update-in [:dir] (fn [_] reset! [x y])))
 
+
+;food container
+(def food (atom #{}))
+
+(defn get-matrix []
+  (let [block-range (range 0 block-amount)
+        matrix (apply concat (map #(zipmap block-range (repeat %)) block-range))]
+    (vec matrix)))
+
+(defn get-free-squares []
+  (let [all-squares (get-matrix)
+        {:keys [body]} @snake-body]
+    (filter #(nil? (get (set body) %)) all-squares)))
+
+(defn get-food-pos []
+  (let [choices (get-free-squares)]
+    (rand-nth choices)))
+
 (defn reset-game! []
-  (reset! snake-body {:body [[0 0] [1 0] [2 0] [3 0]] :dir [0 1]})
+  (reset! snake-body {:body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? false})
   (reset! food #{}))
 ;watcher that detects food collision
 (add-watch snake-body :key (fn [k r os ns]
@@ -57,27 +72,36 @@
 
 ; update
 (defn update []
-  (when-not (or (self-collide?) (snake-outside-screen?))
-    (when (place-food?) (swap! food conj [(rand-int block-amount) (rand-int block-amount)]))
-    (move-snake))
-  )
+  (let [{:keys [dead?]} @snake-body]
+    (if (or (self-collide?) (snake-outside-screen?))
+      (swap! snake-body update-in [:dead?] #(or true %)))
+    (when-not dead?
+      (when (place-food?) (swap! food conj (get-food-pos)))
+      (move-snake))))
 
 ; draw
 (defn draw []
-  (let [{:keys [body]} @snake-body]
+  (let [{:keys [body dead?]} @snake-body]
     ; set background color to dark gray, draw color to white
     (q/background-float 0x20)
     ;draw snake
     (q/fill 0 255 0)
-    (doseq [[x y] body]
+    (doseq [[x y] body
+            green (range 0 (count body))]
       (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
     ;draw food
     (q/fill 255 0 0)
     (doseq [[x y] @food]
       (q/rect (* x cell-width) (* y cell-width) cell-width cell-width))
-    ))
+    (q/fill 255 255 255)
+    (if dead?
+      (q/text "Space to start!"
+              (/ scr-size 2)
+              (/ scr-size 2)))))
 
-
+(defn setup []
+  (q/smooth) (q/no-stroke) (q/frame-rate 30) (q/text-font (q/create-font "DejaVu Sans" 28 true))
+  (q/text-align :center :center))
 ; input
 (defn key-pressed []
   (let [{:keys [dir]} @snake-body]
@@ -91,6 +115,6 @@
 (q/defsketch snake-game
              :title "Snake"
              :size [scr-size scr-size]
-             :setup (fn [] (q/smooth) (q/no-stroke) (q/frame-rate 30))
+             :setup (fn []  (setup))
              :draw (fn [] (update) (draw))
              :key-pressed key-pressed)
