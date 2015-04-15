@@ -34,6 +34,7 @@
       (= (q/key-code) (KeyEvent/VK_DOWN)) (if (not (= dir [0 -1])) (rules/snake-change-dir 0 1))
       (= (q/key-code) (KeyEvent/VK_LEFT)) (if (not (= dir [1 0])) (rules/snake-change-dir -1 0))
       (= (q/key-code) (KeyEvent/VK_RIGHT)) (if (not (= dir [-1 0])) (rules/snake-change-dir 1 0))
+      (= (q/key-code) (KeyEvent/VK_CONTROL)) (reset! rules/rev-time (not @rules/rev-time))
       (= (q/key-code) (KeyEvent/VK_SPACE)) (rules/reset-game!))))
 
 (defn setup []                                              ;quil start setup

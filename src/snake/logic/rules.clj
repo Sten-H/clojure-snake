@@ -5,6 +5,8 @@
   (mapv + v1 v2))
 (defn place-food? [] (< (rand) 0.05))
 
+(def rev-time (atom false))
+(def history (atom '()))
 ;snake
 (def snake-body (atom {:body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? true}))
 
@@ -26,7 +28,9 @@
   (let [{:keys [body dir]} @snake-body]
     (let [new-head (v+ (first body) dir)]
       (swap! snake-body update-in [:body]
-             #(vec (cons new-head (pop %))))))) ;pop tail, add new head
+             #(vec (cons new-head (pop %))))                ;pop tail, add new head
+      (swap! history (fn [x] (cons @snake-body x)))
+      )))
 
 (defn snake-change-dir [x y]
   (swap! snake-body update-in [:dir] (fn [_] reset! [x y])))
@@ -54,19 +58,33 @@
   (reset! food #{}))
 
 ;watcher that detects food collision
-(add-watch snake-body :key (fn [k r os ns]
-                             (let [{:keys [body]} ns
-                                   meal  (get @food (first body))]
-                               (when meal
-                                 (swap! food disj meal)                 ;Removes the food piece
-                                 (swap! snake-body update-in [:body]
-                                        #(grow-snake %))))))          ;Re-adds tail, so it does not get shortened
-
+;(add-watch snake-body :key (fn [k r os ns]
+;                             (let [{:keys [body]} ns
+;                                   meal  (get @food (first body))]
+;                               (if-not  @rev-time
+;                                 (when meal
+;                                   (swap! food disj meal)                 ;Removes the food piece
+;                                   (swap! snake-body update-in [:body]
+;                                          #(grow-snake %)))))))            ;Re-adds tail, so it does not get shortened
+;
+(defn eat-grow []
+  (let [{:keys [body]} @snake-body
+        meal (get @food (first body))]
+    (when meal
+      (swap! food disj meal)
+      (swap! snake-body update-in [:body] #(grow-snake %))            ;Re-adds tail, so it does not get shortened
+      )))
 ; update
 (defn update [block-amount]
   (let [{:keys [dead?]} @snake-body]
     (if (or (self-collide?) (snake-outside-screen? block-amount))
       (swap! snake-body update-in [:dead?] #(or true %)))
-    (when-not dead?
-      (when (place-food?) (swap! food conj (get-food-pos block-amount)))
-      (move-snake))))
+    (when-not (or dead? @rev-time)
+        (when (place-food?)
+          (swap! food conj (get-food-pos block-amount)))
+        (eat-grow)
+        (move-snake))
+    (when (and @rev-time (not-empty @history))
+      (let [old-state (first @history)]
+      (reset! snake-body old-state)
+      (swap! history (fn [x] (rest x)))))))
