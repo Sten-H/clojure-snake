@@ -1,4 +1,4 @@
-;;;; Contains the rules of a snake game.
+;;;; Contains the rules of snake game.
 (ns snake.logic.rules)
 
 ;;; Vector addition.
@@ -9,8 +9,10 @@
 (def rev-time (atom false))
 (def history (atom '()))
 
+(defn new-snake [dead?]
+  (assoc {} :body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? dead? :food #{}))
 ;;; Snake contains all aspects of the game.
-(def snake (atom {:body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? true :food #{}}))
+(def snake (atom (new-snake true)))
 
 ;;; A vector of all cells in game. Not known before runtime.
 (def block-matrix (atom []))
@@ -21,7 +23,7 @@
         matrix (apply concat (map #(zipmap block-range (repeat %)) block-range))]
     (reset! block-matrix (vec matrix))))
 
-(defn get-free-squares []
+(defn get-free-cells []
   (let [{:keys [body]} @snake]
     (remove (set body) @block-matrix)))
 
@@ -62,6 +64,13 @@
     (or (neg? x) (>= x block-amount)
         (neg? y) (>= y block-amount))))
 
+(defn update-dead [block-amount]
+  (when (or (self-collide?) (snake-outside-screen? block-amount))
+    (swap! snake update-in [:dead?] #(or true %))))
+
+(defn is-dead? []
+  (let [{:keys [dead?]} @snake] (true? dead?)))
+
 (defn place-food? []
   (let [{:keys [food]} @snake] (empty? food)))
 
@@ -69,25 +78,29 @@
 (defn record-state []
   (swap! history (fn [x] (cons @snake x))))
 
+(defn rewind-state []
+  (if-not (empty? @history)
+    (do
+      (reset! snake (first @history))
+      (swap! history rest))
+    (do
+      (reset! rev-time false)
+      (swap! snake update-in [:dead?] #(or true %)))))      ;Pop history reverted to.
+
 (defn reset-game! []
-  (reset! snake {:body [[20 5] [20 4] [20 3] [20 2]], :dir [0 1], :dead? false, :food #{}})
+  (reset! snake (new-snake false))
   (reset! history '())
   (reset! rev-time false))
 
 ;;; Game loop.
 (defn update [block-amount]
-  (let [{:keys [dead?]} @snake]
-    (if (or (self-collide?) (snake-outside-screen? block-amount))
-      (swap! snake update-in [:dead?] #(or true %)))
-    (when-not (or dead? @rev-time)
-      (record-state)
-      (when (place-food?)
-        (swap! snake update-in [:food] conj (rand-nth (get-free-squares))))
-      (eat-grow) (move-snake))
-    (when (and @rev-time (not-empty @history))
-      (let [old-state (first @history)]
-        (reset! snake old-state)
-        (swap! history rest))                                 ;pop history reverted to
-      (when (empty? @history)
-        (reset! rev-time false)
-        (swap! snake update-in [:dead?] #(or true %))))))
+  (update-dead block-amount)
+  (when-not (or @rev-time (is-dead?))
+    (record-state)
+    (move-snake)
+    (eat-grow)
+    (when (place-food?)
+      (swap! snake update-in [:food] conj
+             (rand-nth (get-free-cells)))))                 ;Place food on random free cell.
+  (when @rev-time
+    (rewind-state)))
