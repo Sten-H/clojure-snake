@@ -46,6 +46,11 @@
       (= (q/key-code) (KeyEvent/VK_CONTROL)) (reset! rules/rev-time (not @rules/rev-time))
       (= (q/key-code) (KeyEvent/VK_SPACE)) (rules/reset-game!))))
 
+(defn key-released []
+  (let [{:keys [dir]} @rules/snake]
+    (cond
+      (= (q/key-code) (KeyEvent/VK_CONTROL)) (reset! rules/rev-time (not @rules/rev-time)))))
+
 (defn setup []
   (q/smooth) (q/no-stroke) (q/frame-rate 25) (q/text-font (q/create-font "DejaVu Sans" 28 true))
   (q/text-align :center :center) (rules/define-matrix block-amount))
@@ -55,4 +60,5 @@
              :size [scr-size scr-size]
              :setup (fn []  (setup))
              :draw (fn [] (rules/update block-amount) (draw))
-             :key-pressed key-pressed)
+             :key-pressed key-pressed
+             :key-released key-released)
