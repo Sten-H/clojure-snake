@@ -1,6 +1,4 @@
 ;;;; Draw functions of snake game.
-;;;; Started off from tutorial: http://noobtuts.com/clojure/2d-snake-game,
-;;;; so there are some similarities in the code.
 (ns snake.core
   (:require [snake.logic.rules :as rules]
             [quil.core :as q :include-macros true]))
