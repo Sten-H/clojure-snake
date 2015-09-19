@@ -1,6 +1,5 @@
 ;;;; Contains the rules of snake game.
 (ns snake.logic.rules)
-(enable-console-print!)
 ;;; Helper functions
 (defn v+ [v1 v2]
   (mapv + v1 v2))
